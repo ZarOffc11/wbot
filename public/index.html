@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Bot - Pairing Code</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
+        .container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #25D366; color: white; border: none; cursor: pointer; }
+        .status { padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .pairing-code { font-size: 24px; font-weight: bold; text-align: center; color: #25D366; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WhatsApp Bot Setup</h1>
+        
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+        
+        <div id="connectionSection">
+            <input type="text" id="phoneNumber" placeholder="Enter your phone number (with country code)" value="62">
+            <button onclick="requestPairingCode()">Get Pairing Code</button>
+        </div>
+        
+        <div id="pairingSection" style="display: none;">
+            <h3>Your Pairing Code:</h3>
+            <div id="pairingCode" class="pairing-code"></div>
+            <p>Enter this code in your WhatsApp linked devices section</p>
+        </div>
+        
+        <div id="userInfo" style="display: none;"></div>
+    </div>
+
+    <script>
+        async function requestPairingCode() {
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            
+            if (!phoneNumber) {
+                alert('Please enter your phone number');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/request-pairing', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phoneNumber })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('pairingCode').textContent = data.pairingCode;
+                    document.getElementById('pairingSection').style.display = 'block';
+                    document.getElementById('connectionSection').style.display = 'none';
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to request pairing code');
+            }
+        }
+        
+        // Check connection status periodically
+        async function checkStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                
+                if (data.connected) {
+                    statusDiv.className = 'status connected';
+                    statusDiv.innerHTML = `Status: Connected as ${data.user.id}`;
+                    document.getElementById('pairingSection').style.display = 'none';
+                    document.getElementById('connectionSection').style.display = 'none';
+                } else {
+                    statusDiv.className = 'status disconnected';
+                    statusDiv.innerHTML = 'Status: Disconnected';
+                    
+                    if (data.pairingCode) {
+                        document.getElementById('pairingCode').textContent = data.pairingCode;
+                        document.getElementById('pairingSection').style.display = 'block';
+                        document.getElementById('connectionSection').style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+        
+        // Check status every 3 seconds
+        setInterval(checkStatus, 3000);
+        checkStatus();
+    </script>
+</body>
+</html>
