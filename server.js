@@ -1,5 +1,4 @@
 const express = require('express');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const path = require('path');
 
@@ -11,36 +10,40 @@ app.use(express.static('public'));
 
 let sock = null;
 let pairingCode = null;
+let baileys = null;
 
-// Function to initialize WhatsApp
+// Load Baileys dengan dynamic import
+async function loadBaileys() {
+    if (!baileys) {
+        baileys = await import('@whiskeysockets/baileys');
+    }
+    return baileys;
+}
+
 async function connectToWhatsApp() {
+    const { useMultiFileAuthState, makeWASocket, DisconnectReason, Browsers } = await loadBaileys();
+    
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
     
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // Nonaktifkan QR terminal
+        printQRInTerminal: false,
         browser: Browsers.ubuntu('Chrome')
     });
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
-        if (qr) {
-            console.log('QR Code received:', qr);
-        }
-
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
             
             if (shouldReconnect) {
                 console.log('Connection closed, reconnecting...');
                 connectToWhatsApp();
-            } else {
-                console.log('Connection closed, please login again.');
             }
         } else if (connection === 'open') {
             console.log('WhatsApp connected successfully!');
-            pairingCode = null; // Reset pairing code setelah terhubung
+            pairingCode = null;
         }
     });
 
@@ -49,15 +52,14 @@ async function connectToWhatsApp() {
     return sock;
 }
 
-// API untuk request pairing code
 app.post('/request-pairing', async (req, res) => {
     try {
         if (!sock) {
             await connectToWhatsApp();
         }
         
-        // Request pairing code
-        pairingCode = await sock.requestPairingCode(req.body.phoneNumber);
+        const phoneNumber = req.body.phoneNumber;
+        pairingCode = await sock.requestPairingCode(phoneNumber);
         
         res.json({ 
             success: true, 
@@ -65,7 +67,7 @@ app.post('/request-pairing', async (req, res) => {
             message: 'Pairing code generated successfully'
         });
     } catch (error) {
-        console.error('Error generating pairing code:', error);
+        console.error('Error:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Failed to generate pairing code' 
@@ -73,7 +75,6 @@ app.post('/request-pairing', async (req, res) => {
     }
 });
 
-// API untuk check connection status
 app.get('/status', (req, res) => {
     if (sock && sock.user) {
         res.json({ 
@@ -84,20 +85,6 @@ app.get('/status', (req, res) => {
         res.json({ 
             connected: false, 
             pairingCode 
-        });
-    }
-});
-
-// Handle messages
-sock.ev.on('messages.upsert', async (m) => {
-    const message = m.messages[0];
-    
-    if (!message.key.fromMe && m.type === 'notify') {
-        console.log('Received message:', message);
-        
-        // Auto reply example
-        await sock.sendMessage(message.key.remoteJid, { 
-            text: 'Hello! This is an auto-reply from your WhatsApp bot.' 
         });
     }
 });
