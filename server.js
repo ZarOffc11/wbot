@@ -89,6 +89,26 @@ app.get('/status', (req, res) => {
     }
 });
 
+app.get('/send-message1', (req, res) => {
+    if (!sock) {
+        res.status(400).json({
+            status: "Not Connected to WhatsApp!"
+        }) 
+    }
+    try {
+    await sock.sendMessage("6289670470227@s.whatsapp.net", { text: "Tes 1 Berhasil!" }, { quotes: null })
+    res.json({
+        status: 200,
+        message: "Tes Berhasil Dikirim!"
+    })
+    } catch (err) {
+        res.status(500).json({
+            message: "Tes Gagal!", 
+            error: err
+        }) 
+    }
+}
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     connectToWhatsApp();
