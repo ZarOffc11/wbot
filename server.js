@@ -124,16 +124,6 @@ async function connectToWhatsApp(phoneNumber) {
             
             if (!message.key.fromMe && m.type === 'notify') {
                 console.log(`📨 ${phoneNumber} received message from:`, message.key.remoteJid);
-                
-                try {
-                    // Auto reply dengan identifikasi nomor
-                    await sock.sendMessage(message.key.remoteJid, { 
-                        text: `Hello! This is an auto-reply from ${phoneNumber}'s WhatsApp bot.` 
-                    });
-                    console.log(`✅ Auto-reply sent from ${phoneNumber}`);
-                } catch (error) {
-                    console.error(`❌ Error sending auto-reply from ${phoneNumber}:`, error);
-                }
             }
         });
 
