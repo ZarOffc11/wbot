@@ -59,16 +59,6 @@ async function connectToWhatsApp() {
             if (!message.key.fromMe && m.type === 'notify') {
                 console.log('📨 Received message from:', message.key.remoteJid);
                 console.log('Message content:', message.message);
-                
-                try {
-                    // Auto reply example
-                    await sock.sendMessage(message.key.remoteJid, { 
-                        text: 'Hello! This is an auto-reply from your WhatsApp bot.' 
-                    });
-                    console.log('✅ Auto-reply sent');
-                } catch (error) {
-                    console.error('❌ Error sending auto-reply:', error);
-                }
             }
         });
 
