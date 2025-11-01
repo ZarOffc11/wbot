@@ -3,151 +3,667 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bot - Pairing Code</title>
+    <title>WhatsApp Bot - Multi Session</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        
+        :root {
+            --primary: #25D366;
+            --primary-dark: #128C7E;
+            --secondary: #667eea;
+            --dark-bg: #0f0f0f;
+            --dark-card: #1a1a1a;
+            --dark-border: #333;
+            --text-light: #ffffff;
+            --text-gray: #b0b0b0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
+            color: var(--text-light);
             min-height: 100vh;
             padding: 20px;
+            line-height: 1.6;
         }
+        
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
-            background: white;
-            border-radius: 15px;
+            background: var(--dark-card);
+            border-radius: 20px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: 1px solid var(--dark-border);
         }
-        .status {
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        
+        .header {
             text-align: center;
-            font-weight: bold;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--dark-border);
+            padding-bottom: 20px;
         }
-        .connected {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
-        }
-        .disconnected {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #f5c6cb;
-        }
-        .section {
-            margin: 25px 0;
-            padding: 20px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        input, textarea, button {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
+        
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
         }
-        button {
-            background: #25D366;
-            color: white;
+        
+        .header p {
+            color: var(--text-gray);
+            font-size: 1.1rem;
+        }
+        
+        .status-card {
+            background: linear-gradient(135deg, #2d2d2d, #1f1f1f);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            border-left: 5px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .status-connected {
+            border-left-color: var(--success);
+            background: linear-gradient(135deg, #1e3a2f, #15271f);
+        }
+        
+        .status-disconnected {
+            border-left-color: var(--error);
+            background: linear-gradient(135deg, #3a1e1e, #271515);
+        }
+        
+        .status-icon {
+            font-size: 2rem;
+            margin-bottom: 15px;
+        }
+        
+        .status-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .status-details {
+            color: var(--text-gray);
+            font-size: 0.9rem;
+        }
+        
+        .section {
+            background: var(--dark-card);
+            border: 1px solid var(--dark-border);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            color: var(--text-light);
+        }
+        
+        .section-title i {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-gray);
+            font-weight: 500;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 15px;
+            background: #2d2d2d;
+            border: 2px solid var(--dark-border);
+            border-radius: 10px;
+            color: var(--text-light);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: #666;
+        }
+        
+        .btn {
+            padding: 15px 25px;
             border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
-            font-weight: bold;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background: #128C7E;
-        }
-        button:disabled {
-            background: #cccccc;
-            cursor: not-allowed;
-        }
-        .pairing-code {
-            font-size: 32px;
-            font-weight: bold;
-            text-align: center;
-            color: #25D366;
-            margin: 15px 0;
-        }
-        .quick-test {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
             gap: 10px;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(37, 211, 102, 0.3);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary), #5a67d8);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--error), #dc2626);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        
+        .pairing-code {
+            font-size: 3rem;
+            font-weight: 800;
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 20px 0;
+            letter-spacing: 5px;
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .instructions {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid var(--warning);
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            color: var(--text-gray);
+        }
+        
+        .instructions li {
+            margin-bottom: 10px;
+        }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .connection-info {
+            background: linear-gradient(135deg, #1e3a2f, #15271f);
+            padding: 20px;
+            border-radius: 10px;
             margin-top: 15px;
         }
-        .quick-test button {
-            background: #667eea;
+        
+        .connection-item {
+            display: flex;
+            justify-content: between;
+            margin-bottom: 8px;
         }
-        .quick-test button:hover {
-            background: #5a6fd8;
+        
+        .connection-label {
+            color: var(--text-gray);
+            min-width: 120px;
+        }
+        
+        .connection-value {
+            color: var(--text-light);
+            font-weight: 500;
+        }
+        
+        .active-connections {
+            margin-top: 10px;
+        }
+        
+        .connection-badge {
+            display: inline-block;
+            background: var(--success);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin: 5px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .pairing-code {
+                font-size: 2rem;
+                letter-spacing: 3px;
+            }
+            
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 style="text-align: center; margin-bottom: 20px; color: #333;">🤖 WhatsApp Bot</h1>
-        
-        <div id="status" class="status disconnected">
-            🔌 Connecting...
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fab fa-whatsapp"></i> WhatsApp Bot Manager</h1>
+            <p>Manage multiple WhatsApp sessions with pairing codes</p>
         </div>
-        
-        <!-- Pairing Section -->
-        <div class="section" id="pairingSection">
-            <h2>🔐 Pair Your WhatsApp</h2>
-            <div class="form-group">
-                <input type="text" id="phoneNumber" placeholder="Phone number (with country code)" value="62">
-                <button onclick="requestPairingCode()">Get Pairing Code</button>
+
+        <!-- Status Card -->
+        <div class="status-card" id="statusCard">
+            <div class="status-icon">
+                <i class="fas fa-circle-notch fa-spin" id="statusIcon"></i>
             </div>
+            <div class="status-text" id="statusText">Checking connection status...</div>
+            <div class="status-details" id="statusDetails"></div>
+        </div>
+
+        <!-- Pairing Section -->
+        <div class="section fade-in" id="pairingSection">
+            <div class="section-title">
+                <i class="fas fa-link"></i>
+                <h2>Pair New WhatsApp</h2>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-phone"></i> Phone Number (with country code)
+                </label>
+                <input type="text" id="phoneNumber" placeholder="628123456789" value="62">
+            </div>
+            
+            <button class="btn btn-primary" onclick="requestPairingCode()">
+                <i class="fas fa-qrcode"></i> Get Pairing Code
+            </button>
         </div>
 
         <!-- Pairing Code Display -->
-        <div class="section" id="pairingCodeSection" style="display: none;">
-            <h2>📋 Your Pairing Code</h2>
-            <div id="pairingCodeDisplay" class="pairing-code"></div>
-            <p style="text-align: center;">Enter this code in WhatsApp → Linked Devices</p>
-        </div>
-
-        <!-- Test Message Section -->
-        <div class="section" id="testSection" style="display: none;">
-            <h2>📤 Test Message</h2>
-            <div class="form-group">
-                <input type="text" id="testNumber" placeholder="Phone number" value="62">
-                <textarea id="testMessage" placeholder="Your test message" rows="3">Hello from WhatsApp Bot! 🚀</textarea>
-                <button onclick="sendTestMessage()">Send Test Message</button>
+        <div class="section hidden fade-in" id="pairingCodeSection">
+            <div class="section-title">
+                <i class="fas fa-key"></i>
+                <h2>Your Pairing Code</h2>
             </div>
             
-            <div class="quick-test">
-                <button onclick="sendHello()">Send Hello 👋</button>
-                <button onclick="sendQuickTest()">Quick Test ✅</button>
+            <div class="pairing-code" id="pairingCodeDisplay"></div>
+            
+            <div class="instructions">
+                <p><strong><i class="fas fa-info-circle"></i> How to use:</strong></p>
+                <ol>
+                    <li>Open WhatsApp on your phone</li>
+                    <li>Go to <strong>Settings → Linked Devices → Link a Device</strong></li>
+                    <li>Enter the pairing code above</li>
+                    <li>Wait for connection confirmation</li>
+                </ol>
+            </div>
+            
+            <button class="btn btn-secondary" onclick="checkStatus()">
+                <i class="fas fa-sync-alt"></i> Check Connection Status
+            </button>
+        </div>
+
+        <!-- Connected Section -->
+        <div class="section hidden fade-in" id="connectedSection">
+            <div class="section-title">
+                <i class="fas fa-check-circle"></i>
+                <h2>Connected WhatsApp Accounts</h2>
+            </div>
+            
+            <div id="connectionList"></div>
+            
+            <div class="quick-actions">
+                <button class="btn btn-primary" onclick="refreshConnections()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button class="btn btn-secondary" onclick="showAllConnections()">
+                    <i class="fas fa-list"></i> View All
+                </button>
             </div>
         </div>
 
-        <!-- Connection Info -->
-        <div class="section" id="connectionInfo" style="display: none;">
-            <h2>✅ Connected</h2>
-            <div id="userInfo"></div>
+        <!-- Message Section -->
+        <div class="section fade-in" id="messageSection">
+            <div class="section-title">
+                <i class="fas fa-paper-plane"></i>
+                <h2>Send Test Message</h2>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-user"></i> From (Your connected number)
+                </label>
+                <select id="fromNumber">
+                    <option value="">Select a connected number...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-mobile-alt"></i> To (Target number)
+                </label>
+                <input type="text" id="toNumber" placeholder="628987654321">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-comment"></i> Message
+                </label>
+                <textarea id="messageText" rows="4" placeholder="Enter your message here...">Hello from WhatsApp Bot! 🚀</textarea>
+            </div>
+            
+            <div class="quick-actions">
+                <button class="btn btn-primary" onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i> Send Message
+                </button>
+                <button class="btn btn-secondary" onclick="sendHello()">
+                    <i class="fas fa-hand-wave"></i> Send Hello
+                </button>
+                <button class="btn btn-secondary" onclick="quickTest()">
+                    <i class="fas fa-bolt"></i> Quick Test
+                </button>
+            </div>
+        </div>
+
+        <!-- Active Connections Modal -->
+        <div class="section hidden fade-in" id="allConnectionsSection">
+            <div class="section-title">
+                <i class="fas fa-network-wired"></i>
+                <h2>All Active Connections</h2>
+            </div>
+            
+            <div id="allConnectionsList"></div>
+            
+            <button class="btn btn-secondary" onclick="hideAllConnections()">
+                <i class="fas fa-arrow-left"></i> Back
+            </button>
         </div>
     </div>
 
     <script>
+        let currentPhoneNumber = '';
+        let checkStatusInterval;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+            checkStatusInterval = setInterval(checkStatus, 5000); // Check every 5 seconds
+        });
+
+        // Check connection status
+        async function checkStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                
+                updateStatusDisplay(data);
+                updateFromNumberDropdown(data);
+                
+            } catch (error) {
+                console.error('Error checking status:', error);
+                updateStatusDisplay({ connected: false, error: true });
+            }
+        }
+
+        // Update status display
+        function updateStatusDisplay(data) {
+            const statusCard = document.getElementById('statusCard');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+            const statusDetails = document.getElementById('statusDetails');
+            const pairingSection = document.getElementById('pairingSection');
+            const pairingCodeSection = document.getElementById('pairingCodeSection');
+            const connectedSection = document.getElementById('connectedSection');
+            const messageSection = document.getElementById('messageSection');
+
+            if (data.error) {
+                statusCard.className = 'status-card status-disconnected';
+                statusIcon.className = 'fas fa-exclamation-triangle';
+                statusText.textContent = 'Connection Error';
+                statusDetails.textContent = 'Failed to connect to server';
+                return;
+            }
+
+            if (data.connected && data.user) {
+                // Connected state
+                statusCard.className = 'status-card status-connected';
+                statusIcon.className = 'fas fa-check-circle';
+                statusText.textContent = 'WhatsApp Connected';
+                statusDetails.innerHTML = `
+                    Connected as: <strong>${data.user.name || data.user.id}</strong><br>
+                    Phone: <strong>${data.phoneNumber}</strong>
+                `;
+                
+                pairingSection.classList.add('hidden');
+                pairingCodeSection.classList.add('hidden');
+                connectedSection.classList.remove('hidden');
+                messageSection.classList.remove('hidden');
+                
+                updateConnectionList([{
+                    phoneNumber: data.phoneNumber,
+                    user: data.user,
+                    connectedAt: data.connectedAt
+                }]);
+                
+            } else if (data.pairingCode) {
+                // Pairing in progress
+                statusCard.className = 'status-card pulse';
+                statusIcon.className = 'fas fa-hourglass-half';
+                statusText.textContent = 'Waiting for Pairing';
+                statusDetails.textContent = `Please enter the pairing code in WhatsApp`;
+                
+                pairingSection.classList.add('hidden');
+                pairingCodeSection.classList.remove('hidden');
+                connectedSection.classList.add('hidden');
+                messageSection.classList.add('hidden');
+                
+                document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
+                
+            } else {
+                // Disconnected state
+                statusCard.className = 'status-card status-disconnected';
+                statusIcon.className = 'fas fa-plug';
+                statusText.textContent = 'WhatsApp Disconnected';
+                statusDetails.textContent = 'Please pair your WhatsApp account to get started';
+                
+                pairingSection.classList.remove('hidden');
+                pairingCodeSection.classList.add('hidden');
+                connectedSection.classList.add('hidden');
+                messageSection.classList.add('hidden');
+            }
+        }
+
+        // Update from number dropdown
+        function updateFromNumberDropdown(data) {
+            const fromNumberSelect = document.getElementById('fromNumber');
+            fromNumberSelect.innerHTML = '<option value="">Select a connected number...</option>';
+            
+            if (data.connected && data.phoneNumber) {
+                const option = document.createElement('option');
+                option.value = data.phoneNumber;
+                option.textContent = `${data.phoneNumber} ${data.user?.name ? `(${data.user.name})` : ''}`;
+                fromNumberSelect.appendChild(option);
+            }
+            
+            // Also check active connections
+            fetchActiveConnections();
+        }
+
+        // Fetch all active connections
+        async function fetchActiveConnections() {
+            try {
+                const response = await fetch('/active-connections');
+                const data = await response.json();
+                
+                if (data.connections && data.connections.length > 0) {
+                    updateConnectionList(data.connections);
+                    updateFromNumberDropdownWithAll(data.connections);
+                }
+            } catch (error) {
+                console.error('Error fetching active connections:', error);
+            }
+        }
+
+        // Update connection list
+        function updateConnectionList(connections) {
+            const connectionList = document.getElementById('connectionList');
+            const allConnectionsList = document.getElementById('allConnectionsList');
+            
+            if (connections.length === 0) {
+                connectionList.innerHTML = '<p style="color: var(--text-gray); text-align: center;">No active connections</p>';
+                allConnectionsList.innerHTML = '<p style="color: var(--text-gray); text-align: center;">No active connections</p>';
+                return;
+            }
+            
+            let html = '';
+            connections.forEach(conn => {
+                html += `
+                    <div class="connection-info">
+                        <div class="connection-item">
+                            <span class="connection-label"><i class="fas fa-phone"></i> Number:</span>
+                            <span class="connection-value">${conn.phoneNumber}</span>
+                        </div>
+                        <div class="connection-item">
+                            <span class="connection-label"><i class="fas fa-user"></i> Name:</span>
+                            <span class="connection-value">${conn.user?.name || 'N/A'}</span>
+                        </div>
+                        <div class="connection-item">
+                            <span class="connection-label"><i class="fas fa-clock"></i> Connected:</span>
+                            <span class="connection-value">${new Date(conn.connectedAt).toLocaleString()}</span>
+                        </div>
+                        <button class="btn btn-danger" onclick="disconnectNumber('${conn.phoneNumber}')" style="margin-top: 10px;">
+                            <i class="fas fa-unlink"></i> Disconnect
+                        </button>
+                    </div>
+                `;
+            });
+            
+            connectionList.innerHTML = html;
+            allConnectionsList.innerHTML = html;
+        }
+
+        // Update from number dropdown with all connections
+        function updateFromNumberDropdownWithAll(connections) {
+            const fromNumberSelect = document.getElementById('fromNumber');
+            const currentValue = fromNumberSelect.value;
+            
+            fromNumberSelect.innerHTML = '<option value="">Select a connected number...</option>';
+            
+            connections.forEach(conn => {
+                const option = document.createElement('option');
+                option.value = conn.phoneNumber;
+                option.textContent = `${conn.phoneNumber} ${conn.user?.name ? `(${conn.user.name})` : ''}`;
+                fromNumberSelect.appendChild(option);
+            });
+            
+            // Restore previous selection if still valid
+            if (currentValue && connections.some(conn => conn.phoneNumber === currentValue)) {
+                fromNumberSelect.value = currentValue;
+            }
+        }
+
+        // Request pairing code
         async function requestPairingCode() {
-            const phoneNumber = document.getElementById('phoneNumber').value;
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
             
             if (!phoneNumber) {
                 alert('Please enter your phone number');
                 return;
             }
+            
+            currentPhoneNumber = phoneNumber;
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            button.disabled = true;
             
             try {
                 const response = await fetch('/request-pairing', {
@@ -161,130 +677,148 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
-                    document.getElementById('pairingCodeSection').style.display = 'block';
-                    document.getElementById('pairingSection').style.display = 'none';
+                    if (data.alreadyConnected) {
+                        alert(`WhatsApp is already connected for ${phoneNumber}`);
+                        checkStatus();
+                    } else {
+                        document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
+                        document.getElementById('pairingSection').classList.add('hidden');
+                        document.getElementById('pairingCodeSection').classList.remove('hidden');
+                    }
                 } else {
                     alert('Error: ' + data.message);
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to request pairing code');
+                alert('Failed to request pairing code: ' + error.message);
+            } finally {
+                button.innerHTML = originalText;
+                button.disabled = false;
             }
         }
 
-        async function sendTestMessage() {
-            const number = document.getElementById('testNumber').value;
-            const text = document.getElementById('testMessage').value;
+        // Send message
+        async function sendMessage() {
+            const fromNumber = document.getElementById('fromNumber').value;
+            const toNumber = document.getElementById('toNumber').value.trim();
+            const message = document.getElementById('messageText').value.trim();
             
-            if (!number || !text) {
-                alert('Please fill in both number and message');
+            if (!fromNumber || !toNumber || !message) {
+                alert('Please fill in all fields');
                 return;
             }
             
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            button.disabled = true;
+            
             try {
-                const response = await fetch(`/send-test?number=${encodeURIComponent(number)}&text=${encodeURIComponent(text)}`);
+                const response = await fetch(`/send-test?from=${encodeURIComponent(fromNumber)}&to=${encodeURIComponent(toNumber)}&text=${encodeURIComponent(message)}`);
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✅ Test message sent successfully!');
+                    alert('✅ Message sent successfully!');
+                    document.getElementById('messageText').value = '';
                 } else {
-                    alert('❌ Failed: ' + data.message);
+                    alert('❌ Failed to send message: ' + data.message);
                 }
             } catch (error) {
-                alert('Error sending test message: ' + error.message);
+                alert('Error sending message: ' + error.message);
+            } finally {
+                button.innerHTML = originalText;
+                button.disabled = false;
             }
         }
 
+        // Send hello message
         async function sendHello() {
-            const number = document.getElementById('testNumber').value || document.getElementById('phoneNumber').value;
+            const fromNumber = document.getElementById('fromNumber').value;
+            const toNumber = document.getElementById('toNumber').value.trim();
             
-            if (!number) {
-                alert('Please enter a phone number');
+            if (!fromNumber || !toNumber) {
+                alert('Please select from number and enter to number');
+                return;
+            }
+            
+            document.getElementById('messageText').value = `Hello from ${fromNumber}'s WhatsApp bot! 🚀`;
+            sendMessage();
+        }
+
+        // Quick test
+        async function quickTest() {
+            const fromNumber = document.getElementById('fromNumber').value;
+            const toNumber = document.getElementById('toNumber').value.trim();
+            
+            if (!fromNumber || !toNumber) {
+                alert('Please select from number and enter to number');
+                return;
+            }
+            
+            document.getElementById('messageText').value = '🚀 Quick test message from WhatsApp Bot!';
+            sendMessage();
+        }
+
+        // Disconnect number
+        async function disconnectNumber(phoneNumber) {
+            if (!confirm(`Are you sure you want to disconnect ${phoneNumber}?`)) {
                 return;
             }
             
             try {
-                const response = await fetch(`/send-hello?number=${encodeURIComponent(number)}`);
+                const response = await fetch('/disconnect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phoneNumber })
+                });
+                
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✅ Hello message sent!');
+                    alert(`✅ Disconnected ${phoneNumber}`);
+                    checkStatus();
+                    fetchActiveConnections();
                 } else {
-                    alert('❌ Failed: ' + data.message);
+                    alert('❌ Failed to disconnect: ' + data.message);
                 }
             } catch (error) {
-                alert('Error sending hello message: ' + error.message);
+                alert('Error disconnecting: ' + error.message);
             }
         }
 
-        async function sendQuickTest() {
-            const number = document.getElementById('testNumber').value || document.getElementById('phoneNumber').value;
-            
-            if (!number) {
-                alert('Please enter a phone number');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/send-test?number=${encodeURIComponent(number)}&text=🚀 Quick test message from WhatsApp Bot!`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('✅ Quick test sent!');
-                } else {
-                    alert('❌ Failed: ' + data.message);
-                }
-            } catch (error) {
-                alert('Error sending quick test: ' + error.message);
-            }
+        // Refresh connections
+        function refreshConnections() {
+            checkStatus();
+            fetchActiveConnections();
         }
 
-        async function checkStatus() {
-            try {
-                const response = await fetch('/status');
-                const data = await response.json();
-                
-                const statusDiv = document.getElementById('status');
-                const testSection = document.getElementById('testSection');
-                const connectionInfo = document.getElementById('connectionInfo');
-                const pairingSection = document.getElementById('pairingSection');
-                const pairingCodeSection = document.getElementById('pairingCodeSection');
-                
-                if (data.connected) {
-                    statusDiv.className = 'status connected';
-                    statusDiv.innerHTML = '✅ Connected to WhatsApp';
-                    testSection.style.display = 'block';
-                    connectionInfo.style.display = 'block';
-                    pairingSection.style.display = 'none';
-                    pairingCodeSection.style.display = 'none';
-                    
-                    document.getElementById('userInfo').innerHTML = `
-                        <p><strong>User ID:</strong> ${data.user.id}</p>
-                        <p><strong>Name:</strong> ${data.user.name || 'N/A'}</p>
-                    `;
-                } else {
-                    statusDiv.className = 'status disconnected';
-                    statusDiv.innerHTML = '❌ Disconnected from WhatsApp';
-                    testSection.style.display = 'none';
-                    connectionInfo.style.display = 'none';
-                    
-                    if (data.pairingCode) {
-                        pairingCodeSection.style.display = 'block';
-                        pairingSection.style.display = 'none';
-                    } else {
-                        pairingCodeSection.style.display = 'none';
-                        pairingSection.style.display = 'block';
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking status:', error);
-            }
+        // Show all connections
+        function showAllConnections() {
+            document.getElementById('connectedSection').classList.add('hidden');
+            document.getElementById('allConnectionsSection').classList.remove('hidden');
+            fetchActiveConnections();
         }
-        
-        // Check status every 3 seconds
-        setInterval(checkStatus, 3000);
-        checkStatus();
+
+        // Hide all connections
+        function hideAllConnections() {
+            document.getElementById('allConnectionsSection').classList.add('hidden');
+            document.getElementById('connectedSection').classList.remove('hidden');
+        }
+
+        // Add some visual effects
+        document.addEventListener('mousemove', function(e) {
+            const cards = document.querySelectorAll('.section, .status-card');
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
     </script>
 </body>
 </html>
