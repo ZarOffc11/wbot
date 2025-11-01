@@ -21,6 +21,41 @@ async function loadBaileys() {
     return baileys;
 }
 
+// Function untuk delete session folder
+function deleteSessionFolder(phoneNumber) {
+    try {
+        const sanitizedNumber = phoneNumber.replace(/[^0-9]/g, '');
+        const sessionFolder = path.join(__dirname, 'sessions', `${sanitizedNumber}-sesi`);
+        
+        if (fs.existsSync(sessionFolder)) {
+            // Hapus semua file dalam folder
+            const files = fs.readdirSync(sessionFolder);
+            for (const file of files) {
+                fs.unlinkSync(path.join(sessionFolder, file));
+            }
+            // Hapus folder itu sendiri
+            fs.rmdirSync(sessionFolder);
+            
+            console.log(`🗑️ Deleted session folder for: ${phoneNumber}`);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error(`❌ Error deleting session folder for ${phoneNumber}:`, error);
+        return false;
+    }
+}
+
+// Function untuk cleanup connection
+function cleanupConnection(phoneNumber) {
+    // Hapus dari active connections
+    activeConnections.delete(phoneNumber);
+    console.log(`🔒 Removed ${phoneNumber} from active connections`);
+    
+    // Hapus session folder
+    deleteSessionFolder(phoneNumber);
+}
+
 // Custom auth state untuk per nomor
 async function useMultiFileAuthStateByNumber(phoneNumber) {
     const { useMultiFileAuthState } = await loadBaileys();
@@ -62,11 +97,12 @@ async function connectToWhatsApp(phoneNumber) {
                 console.log(`🔌 Connection closed for ${phoneNumber}, reconnecting: ${shouldReconnect}`);
                 
                 if (shouldReconnect) {
+                    // Auto reconnect setelah 5 detik
                     setTimeout(() => connectToWhatsApp(phoneNumber), 5000);
                 } else {
-                    // Hapus dari active connections jika logged out
-                    activeConnections.delete(phoneNumber);
-                    console.log(`🗑️ Removed ${phoneNumber} from active connections`);
+                    // LOGOUT / DISCONNECT - HAPUS SESSION
+                    console.log(`🚫 Logged out/disconnected for ${phoneNumber}, cleaning up...`);
+                    cleanupConnection(phoneNumber);
                 }
             } else if (connection === 'open') {
                 console.log(`✅ WhatsApp connected successfully for: ${phoneNumber}`);
@@ -331,7 +367,7 @@ app.get('/send-hello', async (req, res) => {
     }
 });
 
-// API untuk disconnect specific number
+// API untuk disconnect specific number (MANUAL)
 app.post('/disconnect', async (req, res) => {
     try {
         const { phoneNumber } = req.body;
@@ -345,20 +381,30 @@ app.post('/disconnect', async (req, res) => {
 
         if (activeConnections.has(phoneNumber)) {
             const conn = activeConnections.get(phoneNumber);
-            // Logout dari WhatsApp
-            await conn.sock.logout();
-            activeConnections.delete(phoneNumber);
             
-            console.log(`🔒 Disconnected WhatsApp for: ${phoneNumber}`);
+            try {
+                // Logout dari WhatsApp
+                await conn.sock.logout();
+                console.log(`🔒 Manual logout for: ${phoneNumber}`);
+            } catch (logoutError) {
+                console.log(`⚠️ Logout failed, forcing cleanup for: ${phoneNumber}`);
+            }
+            
+            // Cleanup connection dan session folder
+            cleanupConnection(phoneNumber);
             
             res.json({
                 success: true,
-                message: `Disconnected WhatsApp for ${phoneNumber}`
+                message: `Disconnected WhatsApp and deleted session for ${phoneNumber}`
             });
         } else {
+            // Jika tidak ada di active connections, coba hapus session folder saja
+            const folderDeleted = deleteSessionFolder(phoneNumber);
+            
             res.json({
-                success: false,
-                message: `No active connection found for ${phoneNumber}`
+                success: true,
+                message: `No active connection found for ${phoneNumber}` + 
+                         (folderDeleted ? ', but session folder was deleted' : ', no session folder found')
             });
         }
     } catch (error) {
@@ -370,9 +416,68 @@ app.post('/disconnect', async (req, res) => {
     }
 });
 
+// API untuk force cleanup tanpa logout (emergency)
+app.post('/force-cleanup', async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number is required'
+            });
+        }
+
+        // Langsung cleanup tanpa logout
+        cleanupConnection(phoneNumber);
+        
+        res.json({
+            success: true,
+            message: `Force cleanup completed for ${phoneNumber}`
+        });
+    } catch (error) {
+        console.error('Error force cleanup:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to force cleanup: ' + error.message
+        });
+    }
+});
+
+// API untuk list session folders
+app.get('/sessions', (req, res) => {
+    try {
+        const sessionsPath = path.join(__dirname, 'sessions');
+        
+        if (!fs.existsSync(sessionsPath)) {
+            return res.json({ sessions: [] });
+        }
+        
+        const folders = fs.readdirSync(sessionsPath)
+            .filter(folder => fs.statSync(path.join(sessionsPath, folder)).isDirectory())
+            .map(folder => {
+                const folderPath = path.join(sessionsPath, folder);
+                const files = fs.readdirSync(folderPath);
+                return {
+                    folder: folder,
+                    files: files,
+                    isActive: activeConnections.has(folder.replace('-sesi', ''))
+                };
+            });
+        
+        res.json({
+            total: folders.length,
+            sessions: folders
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Initialize server
 app.listen(PORT, () => {
     console.log(`🌐 Server running on http://localhost:${PORT}`);
     console.log(`📁 Session folders will be created in: ./sessions/`);
+    console.log(`🗑️ Auto-cleanup enabled: Session folders will be deleted on disconnect/logout`);
     console.log(`🔗 Multiple WhatsApp accounts supported`);
 });
