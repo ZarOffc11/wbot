@@ -1,5 +1,7 @@
 const express = require('express');
 const { Boom } = require('@hapi/boom');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = 3000;
@@ -7,8 +9,8 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.static('public'));
 
-let sock = null;
-let pairingCode = null;
+// Store active connections per number
+const activeConnections = new Map();
 let baileys = null;
 
 // Load Baileys dengan dynamic import
@@ -19,13 +21,32 @@ async function loadBaileys() {
     return baileys;
 }
 
-async function connectToWhatsApp() {
+// Custom auth state untuk per nomor
+async function useMultiFileAuthStateByNumber(phoneNumber) {
+    const { useMultiFileAuthState } = await loadBaileys();
+    
+    // Sanitize phone number untuk nama folder
+    const sanitizedNumber = phoneNumber.replace(/[^0-9]/g, '');
+    const sessionFolder = path.join(__dirname, 'sessions', `${sanitizedNumber}-sesi`);
+    
+    // Pastikan folder sessions exists
+    if (!fs.existsSync(path.join(__dirname, 'sessions'))) {
+        fs.mkdirSync(path.join(__dirname, 'sessions'));
+    }
+    
+    console.log(`📁 Using session folder: ${sessionFolder}`);
+    return useMultiFileAuthState(sessionFolder);
+}
+
+// Function untuk connect WhatsApp per nomor
+async function connectToWhatsApp(phoneNumber) {
     try {
-        const { useMultiFileAuthState, makeWASocket, DisconnectReason, Browsers } = await loadBaileys();
+        console.log(`🔗 Connecting WhatsApp for: ${phoneNumber}`);
         
-        const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+        const { makeWASocket, DisconnectReason, Browsers } = await loadBaileys();
+        const { state, saveCreds } = await useMultiFileAuthStateByNumber(phoneNumber);
         
-        sock = makeWASocket({
+        const sock = makeWASocket({
             auth: state,
             printQRInTerminal: false,
             browser: Browsers.ubuntu('Chrome')
@@ -33,20 +54,29 @@ async function connectToWhatsApp() {
 
         // Event listener untuk connection update
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
+            const { connection, lastDisconnect } = update;
             
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
                 
+                console.log(`🔌 Connection closed for ${phoneNumber}, reconnecting: ${shouldReconnect}`);
+                
                 if (shouldReconnect) {
-                    console.log('Connection closed, reconnecting...');
-                    connectToWhatsApp();
+                    setTimeout(() => connectToWhatsApp(phoneNumber), 5000);
                 } else {
-                    console.log('Connection closed, please login again.');
+                    // Hapus dari active connections jika logged out
+                    activeConnections.delete(phoneNumber);
+                    console.log(`🗑️ Removed ${phoneNumber} from active connections`);
                 }
             } else if (connection === 'open') {
-                console.log('WhatsApp connected successfully!');
-                pairingCode = null;
+                console.log(`✅ WhatsApp connected successfully for: ${phoneNumber}`);
+                
+                // Simpan connection ke map
+                activeConnections.set(phoneNumber, {
+                    sock: sock,
+                    user: sock.user,
+                    connectedAt: new Date()
+                });
             }
         });
 
@@ -57,16 +87,25 @@ async function connectToWhatsApp() {
             const message = m.messages[0];
             
             if (!message.key.fromMe && m.type === 'notify') {
-                console.log('📨 Received message from:', message.key.remoteJid);
-                console.log('Message content:', message.message);
+                console.log(`📨 ${phoneNumber} received message from:`, message.key.remoteJid);
+                
+                try {
+                    // Auto reply dengan identifikasi nomor
+                    await sock.sendMessage(message.key.remoteJid, { 
+                        text: `Hello! This is an auto-reply from ${phoneNumber}'s WhatsApp bot.` 
+                    });
+                    console.log(`✅ Auto-reply sent from ${phoneNumber}`);
+                } catch (error) {
+                    console.error(`❌ Error sending auto-reply from ${phoneNumber}:`, error);
+                }
             }
         });
 
-        console.log('✅ WhatsApp client initialized');
+        console.log(`✅ WhatsApp client initialized for: ${phoneNumber}`);
         return sock;
         
     } catch (error) {
-        console.error('❌ Error initializing WhatsApp:', error);
+        console.error(`❌ Error initializing WhatsApp for ${phoneNumber}:`, error);
         return null;
     }
 }
@@ -74,10 +113,6 @@ async function connectToWhatsApp() {
 // API untuk request pairing code
 app.post('/request-pairing', async (req, res) => {
     try {
-        if (!sock) {
-            await connectToWhatsApp();
-        }
-        
         const { phoneNumber } = req.body;
         if (!phoneNumber) {
             return res.status(400).json({
@@ -85,14 +120,39 @@ app.post('/request-pairing', async (req, res) => {
                 message: 'Phone number is required'
             });
         }
+
+        // Cek apakah sudah ada connection aktif untuk nomor ini
+        if (activeConnections.has(phoneNumber)) {
+            const existingConn = activeConnections.get(phoneNumber);
+            if (existingConn.sock.user) {
+                return res.json({
+                    success: true,
+                    alreadyConnected: true,
+                    message: 'WhatsApp already connected for this number',
+                    user: existingConn.sock.user
+                });
+            }
+        }
+
+        const sock = await connectToWhatsApp(phoneNumber);
         
-        pairingCode = await sock.requestPairingCode(phoneNumber);
+        if (!sock) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to initialize WhatsApp connection'
+            });
+        }
+
+        // Generate pairing code
+        const pairingCode = await sock.requestPairingCode(phoneNumber);
         
         res.json({ 
             success: true, 
             pairingCode,
+            phoneNumber,
             message: 'Pairing code generated successfully'
         });
+        
     } catch (error) {
         console.error('Error generating pairing code:', error);
         res.status(500).json({ 
@@ -102,48 +162,74 @@ app.post('/request-pairing', async (req, res) => {
     }
 });
 
-// API untuk check connection status
+// API untuk check connection status (per nomor)
 app.get('/status', (req, res) => {
-    if (sock && sock.user) {
+    const { number } = req.query;
+    
+    if (number && activeConnections.has(number)) {
+        const conn = activeConnections.get(number);
         res.json({ 
-            connected: true, 
+            connected: true,
+            phoneNumber: number,
             user: {
-                id: sock.user.id,
-                name: sock.user.name
-            }
+                id: conn.user.id,
+                name: conn.user.name
+            },
+            connectedAt: conn.connectedAt
         });
     } else {
         res.json({ 
-            connected: false, 
-            pairingCode 
+            connected: false,
+            phoneNumber: number || null,
+            activeConnections: Array.from(activeConnections.keys())
         });
     }
 });
 
-// Send message via POST (existing)
+// API untuk list semua active connections
+app.get('/active-connections', (req, res) => {
+    const connections = Array.from(activeConnections.entries()).map(([number, data]) => ({
+        phoneNumber: number,
+        connected: true,
+        user: data.user,
+        connectedAt: data.connectedAt
+    }));
+    
+    res.json({
+        total: connections.length,
+        connections: connections
+    });
+});
+
+// Send message via POST (per nomor)
 app.post('/send-message', async (req, res) => {
     try {
-        if (!sock) {
+        const { fromNumber, toNumber, message } = req.body;
+
+        if (!fromNumber || !toNumber || !message) {
             return res.status(400).json({
                 success: false,
-                message: 'WhatsApp not connected'
+                message: 'fromNumber, toNumber, and message are required'
             });
         }
 
-        const { number, message } = req.body;
-        if (!number || !message) {
+        if (!activeConnections.has(fromNumber)) {
             return res.status(400).json({
                 success: false,
-                message: 'Number and message are required'
+                message: `No active WhatsApp connection for ${fromNumber}`
             });
         }
 
-        const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
-        await sock.sendMessage(chatId, { text: message });
+        const conn = activeConnections.get(fromNumber);
+        const chatId = toNumber.includes('@c.us') ? toNumber : `${toNumber}@c.us`;
+        
+        await conn.sock.sendMessage(chatId, { text: message });
         
         res.json({
             success: true,
-            message: 'Message sent successfully'
+            message: 'Message sent successfully',
+            from: fromNumber,
+            to: toNumber
         });
     } catch (error) {
         console.error('Error sending message:', error);
@@ -154,37 +240,38 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-// ✅ NEW: Send test message via GET dengan query parameters
+// ✅ Send test message via GET (per nomor)
 app.get('/send-test', async (req, res) => {
     try {
-        const { number, text } = req.query;
+        const { from, to, text } = req.query;
         
-        if (!sock) {
+        if (!from || !to || !text) {
             return res.status(400).json({
                 success: false,
-                message: 'WhatsApp not connected. Please pair first.'
+                message: 'Parameters "from", "to", and "text" are required'
             });
         }
 
-        if (!number || !text) {
+        if (!activeConnections.has(from)) {
             return res.status(400).json({
                 success: false,
-                message: 'Parameters "number" and "text" are required'
+                message: `No active WhatsApp connection for ${from}. Please pair first.`
             });
         }
 
-        // Format nomor (tambah @c.us jika belum ada)
-        const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
+        const conn = activeConnections.get(from);
+        const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
         
-        console.log(`📤 Sending test message to: ${chatId}`);
+        console.log(`📤 ${from} sending message to: ${chatId}`);
         console.log(`💬 Message: ${text}`);
         
-        await sock.sendMessage(chatId, { text: text });
+        await conn.sock.sendMessage(chatId, { text: text });
         
         res.json({
             success: true,
             message: 'Test message sent successfully',
             data: {
+                from: from,
                 to: chatId,
                 text: text,
                 timestamp: new Date().toISOString()
@@ -200,50 +287,36 @@ app.get('/send-test', async (req, res) => {
     }
 });
 
-// ✅ NEW: Simple test message dengan default text
+// ✅ Send hello message via GET
 app.get('/send-hello', async (req, res) => {
     try {
-        const { number } = req.query;
+        const { from, to } = req.query;
         
-        if (!sock) {
+        if (!from || !to) {
             return res.status(400).json({
                 success: false,
-                message: 'WhatsApp not connected'
+                message: 'Parameters "from" and "to" are required'
             });
         }
 
-        if (!number) {
+        if (!activeConnections.has(from)) {
             return res.status(400).json({
                 success: false,
-                message: 'Parameter "number" is required'
+                message: `No active WhatsApp connection for ${from}`
             });
         }
 
-        const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
-        const testMessage = 'Hello! This is a test message from your WhatsApp bot. 🚀';
+        const conn = activeConnections.get(from);
+        const chatId = to.includes('@c.us') ? to : `${to}@c.us`;
+        const testMessage = `Hello from ${from}'s WhatsApp bot! 🚀`;
         
-        await sock.sendMessage(chatId, {
-    interactiveMessage: {
-        header: "Hello World",
-        title: "Hello World",
-        footer: "telegram: @ZarOffc ",
-        buttons: [
-            {
-                name: "cta_copy",
-                buttonParamsJson: JSON.stringify({
-                    display_text: "copy code",
-                    id: "123456789",              
-                    copy_code: "ABC123XYZ"
-                })
-            }
-        ]
-    }
-}, { quoted: null });
+        await conn.sock.sendMessage(chatId, { text: testMessage });
         
         res.json({
             success: true,
             message: 'Hello message sent successfully',
             data: {
+                from: from,
                 to: chatId,
                 text: testMessage
             }
@@ -258,20 +331,48 @@ app.get('/send-hello', async (req, res) => {
     }
 });
 
-// Initialize WhatsApp connection
-async function initializeApp() {
+// API untuk disconnect specific number
+app.post('/disconnect', async (req, res) => {
     try {
-        await connectToWhatsApp();
-        console.log('🚀 WhatsApp bot initialized');
-    } catch (error) {
-        console.error('❌ Failed to initialize WhatsApp:', error);
-    }
-}
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone number is required'
+            });
+        }
 
+        if (activeConnections.has(phoneNumber)) {
+            const conn = activeConnections.get(phoneNumber);
+            // Logout dari WhatsApp
+            await conn.sock.logout();
+            activeConnections.delete(phoneNumber);
+            
+            console.log(`🔒 Disconnected WhatsApp for: ${phoneNumber}`);
+            
+            res.json({
+                success: true,
+                message: `Disconnected WhatsApp for ${phoneNumber}`
+            });
+        } else {
+            res.json({
+                success: false,
+                message: `No active connection found for ${phoneNumber}`
+            });
+        }
+    } catch (error) {
+        console.error('Error disconnecting:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to disconnect: ' + error.message
+        });
+    }
+});
+
+// Initialize server
 app.listen(PORT, () => {
     console.log(`🌐 Server running on http://localhost:${PORT}`);
-    console.log(`📤 Test endpoints:`);
-    console.log(`   GET /send-test?number=628123456789&text=HelloWorld`);
-    console.log(`   GET /send-hello?number=628123456789`);
-    initializeApp();
+    console.log(`📁 Session folders will be created in: ./sessions/`);
+    console.log(`🔗 Multiple WhatsApp accounts supported`);
 });
