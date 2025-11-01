@@ -238,7 +238,7 @@ app.get('/send-hello', async (req, res) => {
             }
         ]
     }
-}, { quoted: m });
+}, { quoted: null });
         
         res.json({
             success: true,
