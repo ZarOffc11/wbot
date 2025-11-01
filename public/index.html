@@ -1,38 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Bot - Pairing Code</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
-        .container { border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
-        input, button { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-        button { background: #25D366; color: white; border: none; cursor: pointer; }
-        .status { padding: 10px; border-radius: 5px; margin: 10px 0; }
-        .connected { background: #d4edda; color: #155724; }
-        .disconnected { background: #f8d7da; color: #721c24; }
-        .pairing-code { font-size: 24px; font-weight: bold; text-align: center; color: #25D366; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connected {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        .disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        .section {
+            margin: 25px 0;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button {
+            background: #25D366;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #128C7E;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .pairing-code {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            color: #25D366;
+            margin: 15px 0;
+        }
+        .quick-test {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .quick-test button {
+            background: #667eea;
+        }
+        .quick-test button:hover {
+            background: #5a6fd8;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>WhatsApp Bot Setup</h1>
+        <h1 style="text-align: center; margin-bottom: 20px; color: #333;">🤖 WhatsApp Bot</h1>
         
         <div id="status" class="status disconnected">
-            Status: Disconnected
+            🔌 Connecting...
         </div>
         
-        <div id="connectionSection">
-            <input type="text" id="phoneNumber" placeholder="Enter your phone number (with country code)" value="62">
-            <button onclick="requestPairingCode()">Get Pairing Code</button>
+        <!-- Pairing Section -->
+        <div class="section" id="pairingSection">
+            <h2>🔐 Pair Your WhatsApp</h2>
+            <div class="form-group">
+                <input type="text" id="phoneNumber" placeholder="Phone number (with country code)" value="62">
+                <button onclick="requestPairingCode()">Get Pairing Code</button>
+            </div>
         </div>
-        
-        <div id="pairingSection" style="display: none;">
-            <h3>Your Pairing Code:</h3>
-            <div id="pairingCode" class="pairing-code"></div>
-            <p>Enter this code in your WhatsApp linked devices section</p>
+
+        <!-- Pairing Code Display -->
+        <div class="section" id="pairingCodeSection" style="display: none;">
+            <h2>📋 Your Pairing Code</h2>
+            <div id="pairingCodeDisplay" class="pairing-code"></div>
+            <p style="text-align: center;">Enter this code in WhatsApp → Linked Devices</p>
         </div>
-        
-        <div id="userInfo" style="display: none;"></div>
+
+        <!-- Test Message Section -->
+        <div class="section" id="testSection" style="display: none;">
+            <h2>📤 Test Message</h2>
+            <div class="form-group">
+                <input type="text" id="testNumber" placeholder="Phone number" value="62">
+                <textarea id="testMessage" placeholder="Your test message" rows="3">Hello from WhatsApp Bot! 🚀</textarea>
+                <button onclick="sendTestMessage()">Send Test Message</button>
+            </div>
+            
+            <div class="quick-test">
+                <button onclick="sendHello()">Send Hello 👋</button>
+                <button onclick="sendQuickTest()">Quick Test ✅</button>
+            </div>
+        </div>
+
+        <!-- Connection Info -->
+        <div class="section" id="connectionInfo" style="display: none;">
+            <h2>✅ Connected</h2>
+            <div id="userInfo"></div>
+        </div>
     </div>
 
     <script>
@@ -56,9 +161,9 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    document.getElementById('pairingCode').textContent = data.pairingCode;
-                    document.getElementById('pairingSection').style.display = 'block';
-                    document.getElementById('connectionSection').style.display = 'none';
+                    document.getElementById('pairingCodeDisplay').textContent = data.pairingCode;
+                    document.getElementById('pairingCodeSection').style.display = 'block';
+                    document.getElementById('pairingSection').style.display = 'none';
                 } else {
                     alert('Error: ' + data.message);
                 }
@@ -67,28 +172,109 @@
                 alert('Failed to request pairing code');
             }
         }
-        
-        // Check connection status periodically
+
+        async function sendTestMessage() {
+            const number = document.getElementById('testNumber').value;
+            const text = document.getElementById('testMessage').value;
+            
+            if (!number || !text) {
+                alert('Please fill in both number and message');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/send-test?number=${encodeURIComponent(number)}&text=${encodeURIComponent(text)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Test message sent successfully!');
+                } else {
+                    alert('❌ Failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error sending test message: ' + error.message);
+            }
+        }
+
+        async function sendHello() {
+            const number = document.getElementById('testNumber').value || document.getElementById('phoneNumber').value;
+            
+            if (!number) {
+                alert('Please enter a phone number');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/send-hello?number=${encodeURIComponent(number)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Hello message sent!');
+                } else {
+                    alert('❌ Failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error sending hello message: ' + error.message);
+            }
+        }
+
+        async function sendQuickTest() {
+            const number = document.getElementById('testNumber').value || document.getElementById('phoneNumber').value;
+            
+            if (!number) {
+                alert('Please enter a phone number');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/send-test?number=${encodeURIComponent(number)}&text=🚀 Quick test message from WhatsApp Bot!`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Quick test sent!');
+                } else {
+                    alert('❌ Failed: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error sending quick test: ' + error.message);
+            }
+        }
+
         async function checkStatus() {
             try {
                 const response = await fetch('/status');
                 const data = await response.json();
                 
                 const statusDiv = document.getElementById('status');
+                const testSection = document.getElementById('testSection');
+                const connectionInfo = document.getElementById('connectionInfo');
+                const pairingSection = document.getElementById('pairingSection');
+                const pairingCodeSection = document.getElementById('pairingCodeSection');
                 
                 if (data.connected) {
                     statusDiv.className = 'status connected';
-                    statusDiv.innerHTML = `Status: Connected as ${data.user.id}`;
-                    document.getElementById('pairingSection').style.display = 'none';
-                    document.getElementById('connectionSection').style.display = 'none';
+                    statusDiv.innerHTML = '✅ Connected to WhatsApp';
+                    testSection.style.display = 'block';
+                    connectionInfo.style.display = 'block';
+                    pairingSection.style.display = 'none';
+                    pairingCodeSection.style.display = 'none';
+                    
+                    document.getElementById('userInfo').innerHTML = `
+                        <p><strong>User ID:</strong> ${data.user.id}</p>
+                        <p><strong>Name:</strong> ${data.user.name || 'N/A'}</p>
+                    `;
                 } else {
                     statusDiv.className = 'status disconnected';
-                    statusDiv.innerHTML = 'Status: Disconnected';
+                    statusDiv.innerHTML = '❌ Disconnected from WhatsApp';
+                    testSection.style.display = 'none';
+                    connectionInfo.style.display = 'none';
                     
                     if (data.pairingCode) {
-                        document.getElementById('pairingCode').textContent = data.pairingCode;
-                        document.getElementById('pairingSection').style.display = 'block';
-                        document.getElementById('connectionSection').style.display = 'none';
+                        pairingCodeSection.style.display = 'block';
+                        pairingSection.style.display = 'none';
+                    } else {
+                        pairingCodeSection.style.display = 'none';
+                        pairingSection.style.display = 'block';
                     }
                 }
             } catch (error) {
@@ -97,7 +283,8 @@
         }
         
         // Check status every 3 seconds
-        setInterval(checkStatus, 4000);
-</script>
+        setInterval(checkStatus, 3000);
+        checkStatus();
+    </script>
 </body>
 </html>
