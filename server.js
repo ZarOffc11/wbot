@@ -232,7 +232,23 @@ app.get('/send-hello', async (req, res) => {
         const chatId = number.includes('@c.us') ? number : `${number}@c.us`;
         const testMessage = 'Hello! This is a test message from your WhatsApp bot. 🚀';
         
-        await sock.sendMessage(chatId, { text: testMessage });
+        await sock.sendMessage(chatId, {
+    interactiveMessage: {
+        header: "Hello World",
+        title: "Hello World",
+        footer: "telegram: @ZarOffc ",
+        buttons: [
+            {
+                name: "cta_copy",
+                buttonParamsJson: JSON.stringify({
+                    display_text: "copy code",
+                    id: "123456789",              
+                    copy_code: "ABC123XYZ"
+                })
+            }
+        ]
+    }
+}, { quoted: m });
         
         res.json({
             success: true,
