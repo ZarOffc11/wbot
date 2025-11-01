@@ -146,7 +146,7 @@ async function connectToWhatsApp(phoneNumber) {
     }
 }
 
-// API untuk request pairing code
+// API untuk request pairing code - FIXED
 app.post('/request-pairing', async (req, res) => {
     try {
         const { phoneNumber } = req.body;
@@ -170,6 +170,7 @@ app.post('/request-pairing', async (req, res) => {
             }
         }
 
+        console.log(`🔄 Initializing WhatsApp for: ${phoneNumber}`);
         const sock = await connectToWhatsApp(phoneNumber);
         
         if (!sock) {
@@ -179,8 +180,23 @@ app.post('/request-pairing', async (req, res) => {
             });
         }
 
+        // ⚠️ TAMBAHKAN DELAY - tunggu connection siap
+        console.log(`⏳ Waiting for connection to be ready...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Cek lagi apakah sock masih ada dan ready
+        if (!sock || sock.connection === 'close') {
+            return res.status(500).json({
+                success: false,
+                message: 'Connection failed during initialization'
+            });
+        }
+
         // Generate pairing code
+        console.log(`📞 Requesting pairing code for: ${phoneNumber}`);
         const pairingCode = await sock.requestPairingCode(phoneNumber);
+        
+        console.log(`✅ Pairing code generated: ${pairingCode} for ${phoneNumber}`);
         
         res.json({ 
             success: true, 
@@ -190,7 +206,7 @@ app.post('/request-pairing', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Error generating pairing code:', error);
+        console.error('❌ Error generating pairing code:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Failed to generate pairing code: ' + error.message 
