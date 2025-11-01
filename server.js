@@ -204,11 +204,60 @@ app.post('/request-pairing', async (req, res) => {
     }
 });
 
-// API untuk check connection status (per nomor)
+// API untuk check connection status - FIXED
 app.get('/status', (req, res) => {
     const { number } = req.query;
     
-    if (number && activeConnections.has(number)) {
+    // Jika ada parameter number, cek status untuk nomor tertentu
+    if (number) {
+        if (activeConnections.has(number)) {
+            const conn = activeConnections.get(number);
+            res.json({ 
+                connected: true,
+                phoneNumber: number,
+                user: {
+                    id: conn.user.id,
+                    name: conn.user.name
+                },
+                connectedAt: conn.connectedAt
+            });
+        } else {
+            res.json({ 
+                connected: false,
+                phoneNumber: number,
+                activeConnections: Array.from(activeConnections.keys())
+            });
+        }
+    } else {
+        // Jika tidak ada parameter, return semua active connections atau status general
+        if (activeConnections.size > 0) {
+            // Ambil connection pertama (untuk kompatibilitas single connection)
+            const firstConnection = Array.from(activeConnections.entries())[0];
+            res.json({ 
+                connected: true,
+                phoneNumber: firstConnection[0],
+                user: {
+                    id: firstConnection[1].user.id,
+                    name: firstConnection[1].user.name
+                },
+                connectedAt: firstConnection[1].connectedAt,
+                multiConnection: activeConnections.size > 1,
+                totalConnections: activeConnections.size
+            });
+        } else {
+            res.json({ 
+                connected: false,
+                activeConnections: []
+            });
+        }
+    }
+});
+
+// API baru untuk get status by specific number
+app.get('/status/:number', (req, res) => {
+    const { number } = req.params;
+    
+    if (activeConnections.has(number)) {
         const conn = activeConnections.get(number);
         res.json({ 
             connected: true,
@@ -222,8 +271,8 @@ app.get('/status', (req, res) => {
     } else {
         res.json({ 
             connected: false,
-            phoneNumber: number || null,
-            activeConnections: Array.from(activeConnections.keys())
+            phoneNumber: number,
+            message: 'No active connection for this number'
         });
     }
 });
